@@ -43,6 +43,11 @@ func Serialize(s Serializer, req *prompb.WriteRequest) ([][]byte, error) {
 			labels[string(model.LabelName(l.Name))] = string(model.LabelValue(l.Value))
 		}
 
+		if !prometheusWhitelist[labels["__name__"]] {
+			metricsBlocked.Add(float64(1))
+			continue
+		}
+
 		for _, sample := range ts.Samples {
 			epoch := time.Unix(sample.Timestamp/1000, 0).UTC()
 

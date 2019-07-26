@@ -16,6 +16,7 @@ package main
 
 import (
 	"os"
+	"strings"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/sirupsen/logrus"
@@ -31,6 +32,7 @@ var (
 	kafkaCompression = "none"
 	kafkaBatchNumMessages = "10000"
 	serializer Serializer
+	prometheusWhitelist map[string]bool
 )
 
 func init() {
@@ -51,6 +53,13 @@ func init() {
 		kafkaPartition = kafka.TopicPartition{
 			Topic:     &kafkaTopic,
 			Partition: kafka.PartitionAny,
+		}
+	}
+
+	if value := os.Getenv("PROMETHEUS_METRICS_WHITELIST"); value != "" {
+		metricsList := strings.Split(value, ",")
+		for i := 0; i < len(metricsList); i++ {
+			prometheusWhitelist[metricsList[i]] = true
 		}
 	}
 
