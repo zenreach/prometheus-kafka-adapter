@@ -42,7 +42,6 @@ var (
 			Name: "prometheus_kafka_adapter_produce_errors",
 			Help: "Count of errors producing to kafka",
 		})
-
 )
 
 func init() {

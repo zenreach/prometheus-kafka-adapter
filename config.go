@@ -15,6 +15,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -29,10 +30,11 @@ var (
 		Topic:     &kafkaTopic,
 		Partition: kafka.PartitionAny,
 	}
-	kafkaCompression = "none"
+	kafkaCompression      = "none"
 	kafkaBatchNumMessages = "10000"
-	serializer Serializer
-	prometheusWhitelist map[string]bool
+	serializer            Serializer
+	prometheusWhitelist   map[string]bool
+	schemaRegistryId      uint32 = 0
 )
 
 func init() {
@@ -58,17 +60,29 @@ func init() {
 
 	if value := os.Getenv("PROMETHEUS_METRICS_WHITELIST"); value != "" {
 		metricsList := strings.Split(value, ",")
+		prometheusWhitelist = make(map[string]bool)
 		for i := 0; i < len(metricsList); i++ {
 			prometheusWhitelist[metricsList[i]] = true
 		}
 	}
 
+	if value := os.Getenv("SCHEMA_REGISTRY_URL"); value != "" {
+		metricSubject, err := getLatestSubject(value, "Metric")
+
+		if err != nil {
+			logrus.WithError(err).Fatalln("Schema Registry URL provided but couldn't load schema data.")
+		}
+
+		logrus.Info(fmt.Sprintf("Setting schema ID to: %d", metricSubject.ID))
+		schemaRegistryId = metricSubject.ID
+	}
+
 	if value := os.Getenv("KAFKA_COMPRESSION"); value != "" {
-	    kafkaCompression = value
+		kafkaCompression = value
 	}
 
 	if value := os.Getenv("KAFKA_BATCH_NUM_MESSAGES"); value != "" {
-	    kafkaBatchNumMessages = value
+		kafkaBatchNumMessages = value
 	}
 
 	var err error

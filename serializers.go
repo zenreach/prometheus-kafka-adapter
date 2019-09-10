@@ -15,6 +15,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"io/ioutil"
 	"strconv"
@@ -43,7 +44,7 @@ func Serialize(s Serializer, req *prompb.WriteRequest) ([][]byte, error) {
 			labels[string(model.LabelName(l.Name))] = string(model.LabelValue(l.Value))
 		}
 
-		if !prometheusWhitelist[labels["__name__"]] {
+		if len(prometheusWhitelist) > 0 && !prometheusWhitelist[labels["__name__"]] {
 			metricsBlocked.Add(float64(1))
 			continue
 		}
@@ -88,7 +89,28 @@ type AvroJSONSerializer struct {
 }
 
 func (s *AvroJSONSerializer) Marshal(metric map[string]interface{}) ([]byte, error) {
-	return s.codec.TextualFromNative(nil, metric)
+	binaryValue, err := s.codec.BinaryFromNative(nil, metric)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// if using schema registry encode a header with schema ID
+	if schemaRegistryId != 0 {
+		var header []byte
+
+		// first byte is magic byte, always 0 for now
+		header = append(header, byte(0))
+
+		//4-byte schema ID as returned by the Schema Registry
+		binarySchemaId := make([]byte, 4)
+		binary.BigEndian.PutUint32(binarySchemaId, uint32(schemaRegistryId))
+		header = append(header, binarySchemaId...)
+
+		//avro serialized data in Avro’s binary encoding
+		binaryValue = append(header, binaryValue...)
+	}
+	return binaryValue, nil
 }
 
 // NewAvroJSONSerializer builds a new instance of the AvroJSONSerializer
