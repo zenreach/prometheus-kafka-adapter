@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/sirupsen/logrus"
+	"github.com/pkg/errors"
 )
 
 type SchemaRegistrySubject struct {
@@ -20,8 +20,7 @@ type SchemaRegistrySubject struct {
 func getLatestSubject(registryUrl string, subjectName string) (*SchemaRegistrySubject, error) {
 	url, err := url.Parse(registryUrl)
 	if err != nil {
-		logrus.WithError(err).Error("Couldn't parse registry URL.")
-		return nil, err
+		return nil, errors.Wrap(err, "Couldn't parse registry URL.")
 	}
 
 	// default to http
@@ -33,22 +32,19 @@ func getLatestSubject(registryUrl string, subjectName string) (*SchemaRegistrySu
 
 	response, err := http.Get(url.String())
 	if err != nil {
-		logrus.WithError(err).Error("Couldn't retrieve schema information from registry.")
-		return nil, err
+		return nil, errors.Wrap(err, "Couldn't retrieve schema information from registry.")
 	}
 
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		logrus.WithError(err).Error("Couldn't read body from registry response.")
-		return nil, err
+		return nil, errors.Wrap(err, "Couldn't read body from registry response.")
 	}
 
 	var subject = new(SchemaRegistrySubject)
 	err = json.Unmarshal(body, &subject)
 
 	if err != nil {
-		logrus.WithError(err).Error("Couldn't unmashall registry response into object.")
-		return nil, err
+		return nil, errors.Wrap(err, "Couldn't unmashall registry response into object.")
 	}
 
 	return subject, nil
