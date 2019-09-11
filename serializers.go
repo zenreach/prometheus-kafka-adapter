@@ -15,6 +15,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"io/ioutil"
 	"strconv"
@@ -35,12 +36,18 @@ type Serializer interface {
 // Serialize generates the JSON representation for a given Prometheus metric.
 func Serialize(s Serializer, req *prompb.WriteRequest) ([][]byte, error) {
 	result := [][]byte{}
+	hasPrometheusWhiteList := len(prometheusWhitelist) > 0
 
 	for _, ts := range req.Timeseries {
 		labels := make(map[string]string, len(ts.Labels))
 
 		for _, l := range ts.Labels {
 			labels[string(model.LabelName(l.Name))] = string(model.LabelValue(l.Value))
+		}
+
+		if  hasPrometheusWhiteList && !prometheusWhitelist[labels["__name__"]] {
+			metricsBlocked.Add(float64(1))
+			continue
 		}
 
 		for _, sample := range ts.Samples {
@@ -80,10 +87,35 @@ func NewJSONSerializer() (*JSONSerializer, error) {
 // AvroJSONSerializer represents a metrics serializer that writes Avro-JSON
 type AvroJSONSerializer struct {
 	codec *goavro.Codec
+	binarySchemaId []byte
 }
 
 func (s *AvroJSONSerializer) Marshal(metric map[string]interface{}) ([]byte, error) {
-	return s.codec.TextualFromNative(nil, metric)
+	binaryValue, err := s.codec.BinaryFromNative(nil, metric)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// if using schema registry encode a header with schema ID
+	if schemaRegistryId != 0 {
+		var header []byte
+
+		// first byte is magic byte, always 0 for now
+		header = append(header, byte(0))
+
+		if s.binarySchemaId == nil {
+			//4-byte schema ID as returned by the Schema Registry
+			s.binarySchemaId = make([]byte, 4)
+			binary.BigEndian.PutUint32(s.binarySchemaId, uint32(schemaRegistryId))
+		}
+
+		header = append(header, s.binarySchemaId...)
+
+		//avro serialized data in Avro’s binary encoding
+		binaryValue = append(header, binaryValue...)
+	}
+	return binaryValue, nil
 }
 
 // NewAvroJSONSerializer builds a new instance of the AvroJSONSerializer

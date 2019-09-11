@@ -27,9 +27,27 @@ var (
 			Name: "http_requests_total",
 			Help: "Count of all http requests",
 		})
+	metricsBlocked = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "prometheus_kafka_adapter_metrics_blocked",
+			Help: "Count of metrics blocked due to whitelist",
+		})
+	metricsProduced = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "prometheus_kafka_adapter_metrics_produced",
+			Help: "Count of metrics forwarded to kafka",
+		})
+	produceErrors = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "prometheus_kafka_adapter_produce_errors",
+			Help: "Count of errors producing to kafka",
+		})
 )
 
 func init() {
 	prometheus.MustRegister(queueSize)
 	prometheus.MustRegister(httpRequestsTotal)
+	prometheus.MustRegister(metricsProduced)
+	prometheus.MustRegister(metricsBlocked)
+	prometheus.MustRegister(produceErrors)
 }
